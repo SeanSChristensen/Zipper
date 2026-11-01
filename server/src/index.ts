@@ -1,7 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import multer from 'multer'
-import fs from 'node:fs';
+import fs, { unlink } from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'path';
 
@@ -17,6 +17,7 @@ const zipFile = async(fileName:string) => {
   const gzip = zlib.createGzip();
   const source = fs.createReadStream(process.cwd() + '\\uploads\\' + fileName);
   const destination = fs.createWriteStream(process.cwd() + '\\downloads\\' + fileName + '.gz');
+  newDownloads.push(fileName+'.gz')
   source.pipe(gzip).pipe(destination);
 }
 
@@ -30,6 +31,42 @@ var storage = multer.diskStorage({
 })
 
 var upload = multer({ storage: storage });
+
+let newUploads: string[] = [];
+let newDownloads: string[] = [];
+
+const clearUploadsAndDownloads = setInterval(() => {
+  fs.readdir(process.cwd() + '\\uploads\\', (err, files) => {
+  if (err) throw err;
+
+  for (const file of files) {
+    if(newUploads.includes(file)){
+      var index = newUploads.indexOf(file);
+      if (index !== -1) {
+      newUploads.splice(index, 1);}
+    }
+    else{
+          fs.unlink(path.join(process.cwd() + '\\uploads\\', file), (err) => {
+      if (err) throw err;
+    });
+    }
+  }
+});
+  fs.readdir(process.cwd() + '\\downloads\\', (err, files) => {
+  for (const file of files) {
+    if(newDownloads.includes(file)){
+      var index = newDownloads.indexOf(file);
+      if (index !== -1) {
+      newDownloads.splice(index, 1);}
+    }
+    else{
+          fs.unlink(path.join(process.cwd() + '\\downloads\\', file), (err) => {
+      if (err) throw err;
+    });
+    }
+  }
+  })
+}, 120000);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
@@ -49,11 +86,18 @@ app.post('/upload', upload.single('file'),async (_req, res) => {
   res.json({
     filename:_req.file?.filename
   })
-  
+  newUploads.push(_req.file?.filename)
   res.end()
 })
 
-app.get('/download/:zippedFileName', (req, res) => {
+app.get('/download/:zippedFileName', async (req, res) => {
   const { zippedFileName } = req.params;
-  res.download(process.cwd() + '\\downloads\\' + zippedFileName); 
+  res.download(process.cwd() + '\\downloads\\' + zippedFileName, (error) =>{
+  const downloadPath = process.cwd() + '\\downloads\\' + zippedFileName;
+  fs.unlink(downloadPath, (error)=>{
+    if(error){
+      console.log(error);
+    }
+  });
+  })
 });

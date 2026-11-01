@@ -15,7 +15,9 @@
     "@fontsource/roboto": "^5.3.0",
     "@mui/icons-material": "^9.5.0",
     "@mui/material": "^9.5.0",
+    "@types/downloadjs": "^1.4.6",
     "axios": "^1.21.0",
+    "downloadjs": "^1.4.7",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

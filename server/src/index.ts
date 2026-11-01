@@ -13,14 +13,10 @@ app.use(express.json())
 
 //const upload = multer({ dest: 'uploads/' });
 
-const zipFile = (fileName:string) => {
+const zipFile = async(fileName:string) => {
   const gzip = zlib.createGzip();
-  const source = fs.createReadStream(process.cwd() + '/uploads/' + fileName);
-  const destination = fs.createWriteStream(process.cwd() + '/downloads/' + fileName + '.gz');
-
-  console.log(source.path)
-  console.log(destination.path)
-
+  const source = fs.createReadStream(process.cwd() + '\\uploads\\' + fileName);
+  const destination = fs.createWriteStream(process.cwd() + '\\downloads\\' + fileName + '.gz');
   source.pipe(gzip).pipe(destination);
 }
 
@@ -43,14 +39,21 @@ app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`)
 })
 
-app.post('/upload', upload.single('file'),(_req, res) => {
+app.post('/upload', upload.single('file'),async (_req, res) => {
   if(!_req.file){
     res.statusCode=400;
     res.end('No File')
     return
   }
-  zipFile(_req.file?.filename)
-  res.statusCode=200;
-  res.end(_req.file?.filename)
+  await zipFile(_req.file?.filename)
+  res.json({
+    filename:_req.file?.filename
+  })
+  
+  res.end()
 })
 
+app.get('/download/:zippedFileName', (req, res) => {
+  const { zippedFileName } = req.params;
+  res.download(process.cwd() + '\\downloads\\' + zippedFileName); 
+});

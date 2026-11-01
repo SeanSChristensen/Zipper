@@ -7,11 +7,14 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
 import SendIcon from '@mui/icons-material/Send';
 import axios from 'axios';
+import download from "downloadjs";
 
 function App() {
   const [status, setStatus] = useState('checking...')
   const [file, setFile] = useState<File | null>(null)
   const [fileName, setFileName] = useState('')
+  const [isDownloadAvailable, setIsDownloadAvailable] = useState(false)
+  const [downloadFileName, setDownloadFileName] = useState('')
   
 
 
@@ -39,11 +42,18 @@ function App() {
 
     const response = await axios.post('http://localhost:3001/upload', fileData, {
     headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-})
+      'Content-Type': 'multipart/form-data',
+    }}).then(res => {
+      if (res.status === 200){
+        setIsDownloadAvailable(true);
+        setDownloadFileName(res.data.filename)
+      }
+    })
+  }
 
-    await console.log(response);
+  const downloadFile = async () => {
+    const response = await axios.get('http://localhost:3001/download/' + downloadFileName+'.gz', {responseType : 'blob'}
+    ).then(res => download(res.data,downloadFileName+'.gz'))
   }
 
   return (
@@ -72,15 +82,22 @@ function App() {
           Send
         </Button>
         <Typography sx={{ py: 1 }}>Result: </Typography>
-        <Button
+        {isDownloadAvailable ?         <Button
+          variant="contained"
+          component="label"
+          startIcon={<DownloadIcon />}
+          onClick={downloadFile}
+        >
+          Download File
+        </Button> : 
+                <Button
           variant="contained"
           component="label"
           startIcon={<DownloadIcon />}
           disabled
         >
           Download File
-          <input type="file" hidden />
-        </Button>
+        </Button>}
       </Box>
     </Box>
   )

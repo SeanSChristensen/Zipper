@@ -1,10 +1,9 @@
-import { useEffect, useState, ChangeEvent  } from 'react'
+import { useEffect, useState, type ChangeEvent  } from 'react'
 import Chip from '@mui/material/Chip'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import DownloadIcon from '@mui/icons-material/Download';
 import SendIcon from '@mui/icons-material/Send';
 import axios from 'axios';
 import download from "downloadjs";
@@ -13,8 +12,7 @@ function App() {
   const [status, setStatus] = useState('checking...')
   const [file, setFile] = useState<File | null>(null)
   const [fileName, setFileName] = useState('')
-  const [isDownloadAvailable, setIsDownloadAvailable] = useState(false)
-  const [downloadFileName, setDownloadFileName] = useState('')
+
   
 
 
@@ -40,21 +38,14 @@ function App() {
     const fileData = new FormData();
     fileData.append('file', file);
 
-    const response = await axios.post('http://localhost:3001/upload', fileData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    }}).then(res => {
-      if (res.status === 200){
-        setIsDownloadAvailable(true);
-        setDownloadFileName(res.data.filename)
-      }
+    const response = await axios.post('/api/zip', fileData, {
+    responseType: 'blob',
     })
+          if (response.status === 200){
+        download(response.data,fileName + '.gz','application/gzip')
+      }
   }
 
-  const downloadFile = async () => {
-    const response = await axios.get('http://localhost:3001/download/' + downloadFileName+'.gz', {responseType : 'blob'}
-    ).then(res => download(res.data,downloadFileName+'.gz'))
-  }
 
   return (
     <Box>
@@ -81,23 +72,6 @@ function App() {
         <Button variant="contained" endIcon={<SendIcon />} onClick={submitFile}>
           Send
         </Button>
-        <Typography sx={{ py: 1 }}>Result: </Typography>
-        {isDownloadAvailable ?         <Button
-          variant="contained"
-          component="label"
-          startIcon={<DownloadIcon />}
-          onClick={downloadFile}
-        >
-          Download File
-        </Button> : 
-                <Button
-          variant="contained"
-          component="label"
-          startIcon={<DownloadIcon />}
-          disabled
-        >
-          Download File
-        </Button>}
       </Box>
     </Box>
   )

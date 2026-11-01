@@ -4,100 +4,68 @@ import multer from 'multer'
 import fs, { unlink } from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'path';
+import { pipeline } from 'node:stream/promises';
+import os from 'node:os'
+import crypto from 'node:crypto'
 
 const app = express()
 const port = Number(process.env.PORT) || 3001
 
-app.use(cors())
-app.use(express.json())
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads')
+const DOWNLOAD_DIR = path.join(process.cwd(), 'downloads')
+fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+fs.mkdirSync(DOWNLOAD_DIR, { recursive: true })
 
-//const upload = multer({ dest: 'uploads/' });
-
-const zipFile = async(fileName:string) => {
-  const gzip = zlib.createGzip();
-  const source = fs.createReadStream(process.cwd() + '\\uploads\\' + fileName);
-  const destination = fs.createWriteStream(process.cwd() + '\\downloads\\' + fileName + '.gz');
-  newDownloads.push(fileName+'.gz')
-  source.pipe(gzip).pipe(destination);
-}
-
-var storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/')
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname))
-  }
+//Multer configuration for saving files to the disk with unique file names and 100MB limit
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (_req, file, cb) => cb(null, crypto.randomUUID() + path.extname(file.originalname)),
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
 })
 
-var upload = multer({ storage: storage });
-
-let newUploads: string[] = [];
-let newDownloads: string[] = [];
-
-const clearUploadsAndDownloads = setInterval(() => {
-  fs.readdir(process.cwd() + '\\uploads\\', (err, files) => {
-  if (err) throw err;
-
-  for (const file of files) {
-    if(newUploads.includes(file)){
-      var index = newUploads.indexOf(file);
-      if (index !== -1) {
-      newUploads.splice(index, 1);}
-    }
-    else{
-          fs.unlink(path.join(process.cwd() + '\\uploads\\', file), (err) => {
-      if (err) throw err;
-    });
-    }
-  }
-});
-  fs.readdir(process.cwd() + '\\downloads\\', (err, files) => {
-  for (const file of files) {
-    if(newDownloads.includes(file)){
-      var index = newDownloads.indexOf(file);
-      if (index !== -1) {
-      newDownloads.splice(index, 1);}
-    }
-    else{
-          fs.unlink(path.join(process.cwd() + '\\downloads\\', file), (err) => {
-      if (err) throw err;
-    });
-    }
-  }
-  })
-}, 120000);
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' })
+  res.json({ status: 'ok' , instance: os.hostname()})
 })
 
-app.listen(port, () => {
+
+app.post('/api/zip', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    res.status(400).end('No File')
+    return
+  }
+
+  //define file loacation in uploads and download location for later
+  const src = req.file.path
+  const dest = path.join(DOWNLOAD_DIR, req.file.filename + '.gz')
+
+  //define a cleanup function to remove files later
+  const cleanup = () => {
+    fs.unlink(src, () => {})
+    fs.unlink(dest, () => {})
+  }
+
+  try {
+    //zip file
+    await pipeline(fs.createReadStream(src), zlib.createGzip(), fs.createWriteStream(dest))
+  } catch (err) {
+    console.error(err)
+    cleanup()
+    res.status(500).end('Compression failed')
+    return
+  }
+
+  console.log(`[${os.hostname()}] zipped ${req.file.originalname}`)
+  res.download(dest, req.file.originalname + '.gz', (err) => {
+    if (err) console.error(err)
+    cleanup()
+  })
+})
+
+const server = app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`)
 })
 
-app.post('/upload', upload.single('file'),async (_req, res) => {
-  if(!_req.file){
-    res.statusCode=400;
-    res.end('No File')
-    return
-  }
-  await zipFile(_req.file?.filename)
-  res.json({
-    filename:_req.file?.filename
-  })
-  newUploads.push(_req.file?.filename)
-  res.end()
-})
-
-app.get('/download/:zippedFileName', async (req, res) => {
-  const { zippedFileName } = req.params;
-  res.download(process.cwd() + '\\downloads\\' + zippedFileName, (error) =>{
-  const downloadPath = process.cwd() + '\\downloads\\' + zippedFileName;
-  fs.unlink(downloadPath, (error)=>{
-    if(error){
-      console.log(error);
-    }
-  });
-  })
-});
+process.on('SIGTERM', () => server.close(() => process.exit(0)))

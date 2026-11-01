@@ -1,0 +1,12 @@
+services:
+  api:
+    build: ./server
+    expose:
+      - "3001"
+
+  web:
+    build: ./client
+    ports:
+      - "80:80"
+    depends_on:
+      - api

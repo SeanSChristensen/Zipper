@@ -2,13 +2,16 @@
 
 A web-based file compressor built with React, TypeScript, and Express. Upload a file from the browser, the server gzips it, and the compressed `.gz` downloads straight back. The backend is stateless, so it scales horizontally across multiple containers behind an nginx load balancer.
 
+## Screenshots
+![Zipper](./docs/app-screenshot.png)
+
 ## Scaling
 
 The API runs as multiple Docker containers behind nginx. Each upload is compressed and returned in a single request, and its temporary files are deleted as soon as the response is sent. No state is shared between requests, so any container can handle any request.
 
 ![Scaling demo](./docs/scaling-demo.gif)
 
-Load tested with [k6](https://k6.io): 20 concurrent users repeatedly uploading 2 MB files, 25 seconds per run, each API container capped at 1 CPU.
+Load tested with [k6](https://k6.io): 20 concurrent users repeatedly uploading 2 MB files, 25 seconds per run, each API container capped at 1 CPU. The load testing and the scaling demo above were done with the assistance of [Claude](https://claude.ai), Anthropic's AI assistant.
 
 | API containers | Requests / second | Speed-up | p95 latency | Success rate |
 | --- | --- | --- | --- | --- |
